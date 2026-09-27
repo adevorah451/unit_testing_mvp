@@ -1,5 +1,10 @@
 # `notebooks/apps-22nd.ipynb` — cell-by-cell rewrite spec
 
+> **Superseded 2026-09-18.** The notebook this specifies no longer exists: it was replaced by the
+> `notebooks/results*.ipynb` set, generated from `notebooks/build_results.py`. The live plan is
+> `notebook_plan.md`. Kept for the cell-level reasoning, which the rewrite reused; every cell
+> number below refers to a file that is gone.
+
 Applies to the 60-cell notebook as it stands (never executed). **Do not renumber while editing** —
 work bottom-up so the indices below stay valid. New cells are named `<n>a`, `<n>b` and go
 immediately after cell `<n>`. Nothing is deleted outright; final count 60 + 13 new = **73 cells**.

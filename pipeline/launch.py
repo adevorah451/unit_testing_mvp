@@ -74,8 +74,8 @@ def launch(
     exists to explain a failed launch; it is never where a result is read from.
 
     Refuses a run_id whose session already exists. Two processes writing one run directory corrupt
-    it, and `--run-id` resumes anyway, so the fix is to attach to the running session rather than
-    start a second one beside it.
+    it, and re-running under the same `run_name` resumes anyway, so the fix is to attach to the
+    running session rather than start a second one beside it.
     """
     if alive(run_id):
         raise LaunchFailed(

@@ -93,12 +93,12 @@ and found nothing.
 its docstring — because the number it produces will be put in a table next to `TM`, and a protocol
 given more thinking is not a better protocol, it is a different experiment.
 
-`Ablation` shipped at `medium` for no recorded reason and it cost a run. Medium's attempt bound is
-300 s and the task is an *edit* — delete the branch the monitor named, list eight inputs — so the
-model spent a median **26k reasoning characters returning a 1k-character answer**, and 18 of 19
-infra failures were that call hitting its own timeout. `UnitTesting` writes ten complete test
-functions at `low` with **zero** reasoning characters; the authoring task is harder than the editing
-task and gets less budget.
+A protocol once shipped at `medium` for no recorded reason and it cost a run. Medium's attempt bound
+is 300 s and its task was an *edit* — delete one named branch, list eight inputs — so the model spent
+a median **26k reasoning characters returning a 1k-character answer**, and 18 of its 19 infra
+failures were that call hitting its own timeout. `UnitTesting` writes ten complete test functions at
+`low` with **zero** reasoning characters; the authoring task is harder than the editing task and gets
+less budget.
 
 The cheap check before a run, and after:
 

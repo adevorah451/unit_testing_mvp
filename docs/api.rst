@@ -1,7 +1,10 @@
 API reference
 =============
 
-Generated from the docstrings in the source, so it cannot drift from the code.
+Bodies are generated from the docstrings in the source, so no entry below can drift from the code.
+The *list* of modules is hand-maintained and can: it omitted three protocols between August and
+2026-09-18. **A new module under ``pipeline/`` gets an ``automodule`` block here in the same diff
+that adds it.**
 
 ``pipeline.data`` — the dataset, its split, and what a prompt may see
 ---------------------------------------------------------------------
@@ -40,6 +43,26 @@ drifted until three published premises were wrong.
 ------------------------------------------------------------------------
 
 .. automodule:: pipeline.protocols.unit_testing
+   :members:
+
+``pipeline.protocols.u_plans_t_writes`` — the authoring call split across two models
+--------------------------------------------------------------------------------------
+
+The untrusted model sees the submission and returns a plan in prose; the trusted model writes the
+suite from that plan and never sees the submission. Judged by ``unit_testing.suite_verdict``, the
+same function, so this arm cannot drift from the single-call arm on what a clean negative is.
+
+.. automodule:: pipeline.protocols.u_plans_t_writes
+   :members:
+
+``pipeline.protocols.monitor_with_tests`` — the monitor, shown what the suite did
+-----------------------------------------------------------------------------------
+
+Same scale and same parser as ``tm``, so one threshold sweep reads both. ``suite_shown`` orders the
+firing tests first and never truncates one: a firing whose assertion was cut out of the prompt
+leaves the monitor judging a test by its name.
+
+.. automodule:: pipeline.protocols.monitor_with_tests
    :members:
 
 ``pipeline.protocols.solve`` — the trusted model's own attempt

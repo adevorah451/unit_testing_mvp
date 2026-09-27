@@ -12,10 +12,15 @@ runs/
 # post-hoc rescorings of a completed run (reaggregate.py) — reproducible from runs/, don't commit
 reaggregations/
 
-# full APPS pools (~52 MB each), rebuildable with prepare_candidate_pool.py.
-# apps_pool_hard10.json is kept: it is small and every published number uses it.
+# full APPS pools (32-52 MB each), rebuildable with prepare_candidate_pool.py.
+# apps_pool_hard10.json and apps_pool_random50.json are kept: they are small and published
+# numbers use them. A new pool goes in this list in the diff that creates it.
 apps_pool_hard.json
 apps_pool_heldout40.json
+apps_pool_uniform400.json
+
+# archives of runs/, which is itself ignored
+*.zip
 
 # BigCodeBench task byproducts written into CWD during local execution
 split_*

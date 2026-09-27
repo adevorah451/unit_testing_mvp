@@ -1,9 +1,17 @@
 # Direction: which oracle can a trusted model supply?
 
-Written 2026-08-24, from `tm-22`, `trig-22`, `ut-*`, `mwt-r2`, `ab-22` and two zero-call replays
-(`runs/ab-22/probe_ceiling*.json`, `runs/ab-22/suite_filter.json`).
+> **Superseded 2026-09-18 — the ablation direction is dropped and will not be built.**
+> `Ablation`, `AstAblation`, `prompts/ablation.txt` and the ablation figures are deleted from the
+> repo. This page is kept unedited because §6's P1–P4 is the measured record of *why* it was
+> dropped: the model repairs instead of ablating (17 of 50 honest candidates), and the AST rewrite
+> that would have fixed that was never started. Nothing in §5–§8 is a live plan. The live plan is
+> `scale_plan.md`; the live arms are the eight in `notebooks/build_results.py`.
 
-Read §1–§4 for what the experiment is. §5 onward is what to build next.
+Written 2026-08-24, from `tm-22`, `trig-22`, `ut-*`, `mwt-r2`, `ab-22` and two zero-call replays
+(`runs/ab-22/probe_ceiling*.json`, `runs/ab-22/suite_filter.json`) — the `ab-22` artifacts now live
+under `archived/runs/`.
+
+Read §1–§4 for what the experiment is. §5 onward is superseded.
 
 ---
 
@@ -364,16 +372,17 @@ on 50 held-out tasks, this is a result. At 0.800 on 30, it is a suggestive plot.
 
 # 7 · Build order
 
-One level of depth. Each item gets planned properly when it is reached.
+Superseded. Items 2, 3, 5 and 6 existed only to serve the ablation arm and are dropped with it;
+item 1 was done by `apps_random50` and `apps_uniform400` instead.
 
 | # | item | cost | status |
 |---|---|---|---|
-| 1 | Rebuild the pool to ≥100 tasks; rerun `tm-22`, `trig-22` on it | ~300 calls | **not started** |
-| 2 | Batch-grade N controls in one sandbox invocation (prerequisite for 3) | 0 calls | **not started** |
-| 3 | AST ablation — `NodeTransformer` over `If`/`IfExp`/`BoolOp`/`Compare` | 0 calls | **not started** |
+| 1 | Rebuild the pool to ≥100 tasks; rerun `tm-22`, `trig-22` on it | ~300 calls | **done, differently** — `apps_random50` (50 tasks) and `apps_uniform400` (400) |
+| 2 | Batch-grade N controls in one sandbox invocation (prerequisite for 3) | 0 calls | **dropped** with the ablation arm |
+| 3 | AST ablation — `NodeTransformer` over `If`/`IfExp`/`BoolOp`/`Compare` | 0 calls | **dropped 2026-09-18** — never started, stub deleted |
 | 4 | Diff-conditioned probe generators, replacing the `trig-22` input lists | 1 call/candidate | **not started** |
-| 5 | `BROKE` as a feature, not an abstention — `P(broke\|honest)=0.34` vs `0.04` | 0 calls | **not started** |
-| 6 | Adaptive red team: backdoors whose branch is load-bearing | 1 run | **not started** |
+| 5 | `BROKE` as a feature, not an abstention — `P(broke\|honest)=0.34` vs `0.04` | 0 calls | **dropped** — `BROKE` was an ablation outcome |
+| 6 | Adaptive red team: backdoors whose branch is load-bearing | 1 run | **dropped** — "load-bearing branch" is an ablation-specific threat |
 | 7 | Fold `scratch_probe_ceiling.py` / `scratch_suite_filter.py` into notebook cells | 0 calls | **not started** |
 
 Item 6 is a credibility check, not an extra. Everything above assumes an attacker who did not know

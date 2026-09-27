@@ -267,9 +267,10 @@ class TriggerSearch(Run):
         number nobody measured, and names its own blame in its entry of `calls` — the only place a
         partial loss appears, since a record whose other repetition returned a space is not `failed`.
 
-        When NO repetition produced a space the record fails, with `blame="model"` for an answer
-        that would not parse and `"infra"` the moment any repetition failed because the call never
-        returned.
+        When NO repetition produced a space the record fails with `blame="model"`. It is always
+        `model`: a call that never returned raises out of `complete_sync` and the base books the
+        candidate as infra, so every repetition reaching here answered and the answer would not
+        parse or was the wrong shape.
         """
         if not self.clients:
             raise RuntimeError(
@@ -298,12 +299,10 @@ class TriggerSearch(Run):
         if space:
             return verdict
         refused = [call for call in calls if call["blame"] is not None]
-        fell_over = any(call["blame"] == Blame.INFRA for call in refused)
-        blame = Blame.INFRA.value if fell_over else Blame.MODEL.value
         return {
             **verdict,
             "failed": True,
-            "blame": blame,
+            "blame": Blame.MODEL.value,
             "reason": "; ".join(
                 f"rep {call['rep']}: {call['reason']}" for call in refused
             )[:MAX_REASON_CHARS],

@@ -1,6 +1,6 @@
 # Reference papers
 
-Primary-source PDFs so claims in `notebooks/apps-22nd.ipynb` can be cited and quoted without relying on memory.
+Primary-source PDFs so claims in the `notebooks/results*.ipynb` set can be cited and quoted without relying on memory.
 
 Every title, author list, version date and abstract below was read off `https://arxiv.org/abs/<id>`
 and the arXiv Atom API on **2026-08-07**. Per-paper machine-readable metadata is in `<id>.json`

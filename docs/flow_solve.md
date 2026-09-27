@@ -302,7 +302,7 @@ so rather than trust one draw.
 **Therefore: never key a dict on `task_id`.** `{r["task_id"]: r["solution"] for r in
 solve.get_records()}` silently halves the population and keeps whichever record `as_completed`
 happened to append second — completion order, not dataset order. The module docstring's own usage
-example and `notebooks/apps-22nd.ipynb` cell 22 both do exactly this. In `runs/smoke-solve` the two
+example and the results notebooks' solve cell both do exactly this. In `runs/smoke-solve` the two
 records for task `3843` hold different programs (1176 and 1151 characters), so the choice is real
 and is not visible in any count.
 

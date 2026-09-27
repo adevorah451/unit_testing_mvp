@@ -7,8 +7,9 @@ and `testpaths = tests`, so imports are the same here as at the repo root.
 
 `test_end_to_end.py` is the whole suite: one test per protocol — `TM`, `TriggerSearch`,
 `UnitTesting`, `TrustedSolve` — plus `test_a_real_detached_run_rebuilds_itself_in_the_subprocess`,
-which drives the real `Run.run()` on `mockllm/model` and is the only coverage `launch.py` has. Metrics live in
-`notebooks/apps.ipynb` cells and nothing here touches them.
+which drives the real `Run.run()` on `mockllm/model` and is the only coverage `launch.py` has.
+`MonitorWithTests` and `UPlansTWrites` have no test; the gap is tracked in `REVIEW_PLAN.md`.
+Metrics live in the generated `notebooks/results*.ipynb` cells and nothing here touches them.
 
 The per-module suite this replaced was **484 tests, green**, while `UnitTesting` could not parse a
 single answer its own prompt asked for. `prompts.OUTPUT_SPLIT_TESTS` demands *"A single JSON object

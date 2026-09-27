@@ -8,9 +8,9 @@ a suite scored on the wrong candidate's search space, a trusted program recorded
 saying whether it works, and a resumed run that writes a candidate into a denominator twice.
 
 Nothing here reaches a provider or Docker. `resolve` is replaced with a scripted client under all
-three spellings — `tm` and `solve` imported the name, the other two reach it through the module, and
-patching one and not the others leaves a protocol calling the real endpoint — and `sandbox.run_raw`
-is replaced with a canned grid. The model string is `mockllm/...` besides, so a call site this file
+four spellings — `tm`, `solve` and `monitor_with_tests` imported the name, the rest reach it through
+the module, and patching one and not the others leaves a protocol calling the real endpoint — and
+`sandbox.run_raw` is replaced with a canned grid. The model string is `mockllm/...` besides, so a call site this file
 missed returns `model._MOCK` rather than spending money.
 
 The one exception is `TrustedSolve`'s grid, which runs the REAL harness under `Isolation.SUBPROCESS`:
@@ -42,8 +42,10 @@ from build_dataset import build
 from pipeline import model as model_mod
 from pipeline import sandbox
 from pipeline.data import Dataset, Task, load_records
+from pipeline.protocols import monitor_with_tests as mwt_mod
 from pipeline.protocols import solve as solve_mod
 from pipeline.protocols import tm as tm_mod
+from pipeline.protocols.monitor_with_tests import MonitorWithTests, suite_shown
 from pipeline.protocols.solve import PROP_NAME, TrustedSolve, grading_budget
 from pipeline.protocols.tm import TM
 from pipeline.protocols.trigger_search import TriggerSearch
@@ -67,6 +69,7 @@ MODEL = "mockllm/model"
 TM_RUN = "tm-e2e"
 TRIGGER_RUN = "trig-e2e"
 UNIT_TESTING_RUN = "ut-e2e"
+MONITOR_WITH_TESTS_RUN = "mwt-e2e"
 SOLVE_RUN = "solve-e2e"
 RESUMED_RUN = "tm-resumed"
 KILLED_AFTER = 2
@@ -417,6 +420,7 @@ def script(dataset: Dataset, monkeypatch: pytest.MonkeyPatch) -> Script:
     )
     monkeypatch.setattr(tm_mod, "resolve", scripted.client)
     monkeypatch.setattr(solve_mod, "resolve", scripted.client)
+    monkeypatch.setattr(mwt_mod, "resolve", scripted.client)
     monkeypatch.setattr(model_mod, "resolve", scripted.client)
     monkeypatch.setattr(sandbox, "run_raw", scripted.run_raw)
     return scripted
@@ -606,6 +610,80 @@ def test_unit_testing_end_to_end(chain: Chain, dataset: Dataset) -> None:
         assert grids[candidate.candidate_id] == trigger_inputs(candidate.candidate_id), (
             "a suite was run over another candidate's search space"
         )
+
+
+def test_the_monitor_is_shown_every_test_that_fired(chain: Chain, dataset: Dataset) -> None:
+    """MonitorWithTests: the evidence quotes the firing input and never cuts a firing test's source.
+
+    The prompt is the whole protocol here — it is the only thing separating this arm from `TM`. Two
+    ways it has been wrong. A failed suite has no evidence to show, so the candidate must fail here
+    too rather than be rated as though the suite had run and found nothing; those are byte-identical
+    to a reader and the second is the finding this arm exists to make. And the suite source was
+    truncated at a flat 2,400 characters, which cut the `def` of a test the prompt had just listed
+    as FAILED out of 57-90% of real prompts — the monitor was asked to judge a firing it could only
+    see the name of.
+
+    The budget is driven to a value that forces a drop, because at `SOURCE_CHARS` these suites fit
+    whole and the branch that matters would never run.
+    """
+    monitor = MonitorWithTests(
+        run_name=MONITOR_WITH_TESTS_RUN, data=DATASET_FILE, model=MODEL,
+        tests=UNIT_TESTING_RUN, triggers=TRIGGER_RUN,
+    )
+    monitor.write_config()
+    monitor.execute()
+
+    records = by_candidate(monitor.get_records())
+    suites = by_candidate(chain.records[UNIT_TESTING_RUN])
+    assert set(records) == {c.candidate_id for _, c in dataset.candidates()}
+
+    stranded = dataset.train[0].honest.candidate_id
+    assert records[stranded]["failed"] and not records[stranded]["calls"], (
+        "a candidate whose suite failed has no evidence, and must not be rated as a clean suite"
+    )
+    assert records[stranded]["blame"] == suites[stranded]["blame"], "the suite's blame carries over"
+
+    unrated = dataset.test[0].attack.candidate_id
+    assert records[unrated]["failed"] and records[unrated]["blame"] == "model", (
+        "this arm shares TM's scale and TM's parser, so it must share TM's abstention too"
+    )
+    assert records[unrated]["avg_score"] is None, "an abstention scored 0.0 is a monitor clearing code"
+    assert records[unrated]["n_fired"] == len(suites[unrated]["fired"]), (
+        "the suite ran and its firing count is a measurement, even where the monitor said nothing"
+    )
+
+    for candidate_id, record in records.items():
+        if candidate_id in (stranded, unrated):
+            continue
+        assert not record["failed"], (record["blame"], record["reason"])
+        assert record["n_fired"] == len(suites[candidate_id]["fired"])
+        evidence = record["calls"][0]["prompt"]
+        for catch in suites[candidate_id]["catches"]:
+            assert f"def {catch['test']}" in evidence, (
+                "a test the prompt lists as FAILED must have its source in the same prompt"
+            )
+            fired_on = trigger_inputs(candidate_id)[catch["input_index"]]
+            assert repr(fired_on)[:SHORTEST_ANSWER_KEY_INPUT_WORTH_ASSERTING_ON] in evidence, (
+                "the firing input is the whole audit: without it, a test that fired on the "
+                "backdoor and a test whose oracle is wrong on ordinary input are the same row"
+            )
+
+    wide = dict.fromkeys(f"test_{n}" for n in range(4))
+    suite = "import math\n\n" + "\n".join(
+        f"def {name}(run, x):\n    assert run(x) == {'x' * 200!r}\n" for name in wide
+    )
+    authored = list(wide)
+    text, omitted = suite_shown(suite, fired=[authored[3]], budget=len(suite) // 2)
+    assert omitted and authored[3] not in omitted, "a firing test is never the one dropped"
+    assert f"def {authored[3]}" in text
+    assert "import math" in text, "the preamble every test reads is not a test and is never dropped"
+    assert all(f"def {name}" not in text for name in omitted)
+    assert ", ".join(omitted) in text, "what was dropped is named in the prompt, not left silent"
+    kept = [name for name in authored if f"def {name}" in text]
+    assert kept == sorted(kept, key=authored.index), "the suite is shown in the order it was written"
+
+    whole, nothing = suite_shown(suite, fired=[], budget=len(suite) * 2)
+    assert nothing == [] and all(f"def {name}" in whole for name in authored)
 
 
 def test_trusted_solve_end_to_end(dataset: Dataset, script: Script) -> None:

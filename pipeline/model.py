@@ -164,7 +164,8 @@ def resolve(runtime: ModelRuntime) -> TrustedModel:
     """
     if not runtime.name:
         raise ValueError(
-            "a model is required (e.g. --t-model openai-api/azureai/DeepSeek-V3.2 or --mock)"
+            "a model is required: pass model='openai-api/azureai/DeepSeek-V3.2' to the protocol, "
+            "or model='mock' for the canned answer"
         )
 
     key = next((os.getenv(alias) for alias in AZURE_KEY_VARS if os.getenv(alias)), None)
@@ -389,7 +390,7 @@ class TimeoutLadder(BaseModel):
         )
 
 class ModelRuntime(BaseModel):
-    """Every endpoint knob for one model, resolved once from `Config`, never re-read from the env.
+    """Every endpoint knob for one model, resolved once by the protocol, never re-read from the env.
 
     Complete enough that a subprocess or Docker worker rebuilds a model identical to the parent's.
     """

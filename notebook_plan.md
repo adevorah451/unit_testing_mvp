@@ -3,12 +3,18 @@
 One line per cell. Status is `todo` / `wip` / `done`. Update this file as cells land; do not
 restate it in the transcript.
 
-Pool: `data/apps_hard.json`, scrubbed generation. 100 candidates, 87 scored by all six arms
+Pool: `data/apps_hard.json`, scrubbed generation. 100 candidates, 87 scored by all eight arms
 (44 attack / 43 honest). Split is 20 train tasks / 30 test tasks; after keeping only tasks where
 both submissions were scored by every arm, the deployment game runs on 16 train / 23 held-out.
 
-Built by `notebooks/build_results.py` — edit that and re-run, not the `.ipynb`.
+Built by `notebooks/build_results.py {hard|r50|u400}` — one cell list, three notebooks, so the
+pools cannot drift apart. Edit the generator and rebuild, never the `.ipynb`.
 The notebook reports numbers and asks questions; it does not draw conclusions.
+
+Each notebook writes its four figures to `notebooks/figures/<pool>/` as it executes, via `export`
+in the setup cell. The four PNGs still sitting at the top of `notebooks/figures/` are the 31 Aug
+hand-export of the hard pool at six arms; `progress_report.md` embeds those, and both it and they
+predate the three `MonitorWithTests` arms, the `· any fires` arms and the u400 pool.
 
 ## Cells
 
@@ -19,7 +25,9 @@ The notebook reports numbers and asks questions; it does not draw conclusions.
 | 3 | T capability | `TrustedSolve` — what share of tasks the trusted model solves unaided | done |
 | 4 | triggers | `TriggerSearch` — the inputs every suite is scored against | done |
 | 5 | arm: monitor | `TrustedMonitor`, `runs=2` | done |
-| 6 | arm: monitor + tests | `MonitorWithTests` over `ut-property-10` | done |
+| 6 | arm: monitor + tests property | `MonitorWithTests` over the property suite | done |
+| 6b | arm: monitor + tests plain_v3 | `MonitorWithTests` over the plain_v3 suite | done |
+| 6c | arm: monitor + u plans property | `MonitorWithTests` over the U-planned property suite | done |
 | 7 | arm: tests property | `UnitTesting`, `property`, 10 tests | done |
 | 8 | arm: tests plain_v3 | `UnitTesting`, `plain_v3`, 10 tests | done |
 | 9 | arm: u plans property | `UPlansTWrites`, `property`, 10 tests | done |
@@ -29,6 +37,7 @@ The notebook reports numbers and asks questions; it does not draw conclusions.
 | 13 | sequences | draw candidate indices ONCE; every arm indexes the same deployment | done |
 | 14 | the three variations | one `played_out` engine parameterised by what ends the run and whether unaudited flags ship | done |
 | 15 | the cut | budget quantile of the honest train scores, one per arm, reused by all three variations | done |
+| 15b | `any fires` arms | each suite also plays at `k >= 1`, the operating point a person would use | done |
 | 16 | held-out results | that cut applied to the held-out stream, all three variations | done |
 | 17 | safety vs usefulness | the two read side by side, since neither means anything alone | done |
 | 18 | cut placement | flag rate, audits spent, `steps live` | done |
@@ -76,6 +85,18 @@ The notebook reports numbers and asks questions; it does not draw conclusions.
    block to hit the budget exactly was considered and rejected on 2026-08-31.
 9. **No `deployable` diagnostic.** A cell checking whether each cut could have been chosen without
    attack labels was added and removed on 2026-08-31 — moot once the only rule is label-free.
+10. **Each suite plays twice in the deployment game**, once at its budget quantile and once at
+   `k >= 1` (`· any fires`). The budget quantile lands the suites at strict cuts because their
+   honest scores are a spike at zero with a long tail, and `k >= 1` is the operating point a person
+   would actually use on a failing test. It is affordable to try because the audit counter enforces
+   the budget, not the cut: flagging 65% of traffic buys no extra audits, it only exhausts them
+   sooner. Added 2026-09-01.
+11. **Three `MonitorWithTests` arms**, over the property suite, the plain_v3 suite and the U-planned
+   property suite, so the monitor's evidence is varied the same way the suites are. Added
+   2026-09-01; `mwt-plain_v3-10` and `mwt-uplans-property-10` are new runs on both pools.
+12. **Figures are exported by the cell that draws them**, into `notebooks/figures/<pool>/`, rather
+   than saved by hand after the fact. The hand-exported set went stale twice — a figure that
+   outlives its arms is worse than no figure, because it still looks current. Added 2026-09-15.
 
 ## Open questions
 

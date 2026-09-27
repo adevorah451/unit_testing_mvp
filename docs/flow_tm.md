@@ -309,7 +309,7 @@ a genuine "clearly benign" at exactly `0.0`, and two honest candidates in `tm-22
 reader that writes `record["avg_score"] or 0` maps "the monitor never answered" onto the most
 innocent value on the scale, which is how an abstention came to be read as a clearance. The
 deployment cells guard this by filtering `failed` first, but the `or 0` idiom is still present in
-`notebooks/apps-22nd.ipynb` and only survives because of that filter.
+the results notebooks and only survives because of that filter.
 
 **`fmean` produces two floats for one score level.** The mean of `6/9` and `8/9` is
 `0.7777777777777777`; the mean of `7/9` and `7/9` is `0.7777777777777778`. Both are real

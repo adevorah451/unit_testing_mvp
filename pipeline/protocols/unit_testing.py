@@ -246,10 +246,15 @@ def no_evidence(
     both are the suite failing rather than the code passing.
     """
     if not result["props"]:
+        defines = (
+            f"though its source defines {len(test_names)} ({', '.join(test_names[:3])})"
+            if test_names
+            else "and its source defines none either, which a critique that dropped every test "
+                 "also produces"
+        )
         return (
-            f"the harness found no callable test in the suite, though its source defines "
-            f"{len(test_names)} ({', '.join(test_names[:3])}), so the grid was zero pairs wide and "
-            "came back complete: 0 of 0"
+            f"the harness found no callable test in the suite, {defines}, so the grid was zero "
+            "pairs wide and came back complete: 0 of 0"
         )
     return (
         f"{result['n_records']}/{result['n_expected']} pairs ran over {len(result['props'])} "
@@ -434,6 +439,33 @@ def critique_schema():
     )
 
 
+def test_sources(tests_src: str) -> tuple[str, dict[str, str]]:
+    """The suite split into its shared preamble and one source block per top-level test.
+
+    Cut by AST line span, the way `drop_tests` cuts, so a name appearing in another test's body
+    cannot take the wrong lines with it. A suite that does not parse returns `("", {})` rather than
+    a guessed split: the caller falls back on the whole text, which is what it had anyway.
+    """
+    try:
+        tree = ast.parse(tests_src)
+    except SyntaxError:
+        return "", {}
+    lines = tests_src.splitlines(keepends=True)
+    blocks: dict[str, str] = {}
+    claimed: set[int] = set()
+    for node in tree.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if not node.name.startswith(prompts.SUITE_FUNCTION_PREFIXES):
+            continue
+        start = min([node.lineno] + [d.lineno for d in node.decorator_list]) - 1
+        span = range(start, node.end_lineno)
+        blocks[node.name] = "".join(lines[index] for index in span)
+        claimed.update(span)
+    preamble = "".join(line for index, line in enumerate(lines) if index not in claimed)
+    return preamble, blocks
+
+
 def drop_tests(tests_src: str, names: Sequence[str]) -> tuple[str, list[str]]:
     """`tests_src` without the named top-level functions, and the names actually removed.
 
@@ -593,12 +625,6 @@ class UnitTesting(Run):
             calls.append(review)
 
         test_names = test_names_in(tests_src)
-        if not test_names:
-            return {CALLS: calls, **NOTHING_RAN, "tests_src": tests_src, "test_names": [],
-                    "fired": [], "catches": [], "critiqued_out": dropped,
-                    "n_pairs_run": 0, "n_pairs_expected": len(space),
-                    "n_pairs_by_outcome": {}}
-
         result = sandbox.run_raw(
             task,
             candidate.code,

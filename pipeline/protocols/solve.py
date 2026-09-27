@@ -109,8 +109,9 @@ def graded_pairs(
     harness source and shipped into the container, and the sizes are wildly uneven — task 3888
     carries 11 MB of stdin in its first 20 pairs while a 130-pair task can be a few kB. A caller
     running two programs eight-wide against a count cap therefore holds hundreds of MB of source
-    strings at once, which is how an ablation run had its container SIGKILLed by the OOM killer and
-    then died. `max_bytes` is the cap that actually binds; `limit` bounds the wall clock.
+    strings at once, which is how a run grading two programs per candidate had its container
+    SIGKILLed by the OOM killer and then died. `max_bytes` is the cap that actually binds; `limit`
+    bounds the wall clock.
 
     At least one pair always survives, however large: grading nothing would report as `ungraded`,
     and a task silently dropped for being big is a task dropped from the denominator.

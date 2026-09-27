@@ -1,0 +1,80 @@
+% Methodology section. Cites references.bib via \citet/\citep (natbib).
+
+\section{Methodology}
+
+\subsection{Setting}
+
+We work in the standard AI control setting of \citet{greenblatt2024control}. An \emph{untrusted} model ($U$) produces code, and some of that code may contain a backdoor: a program that solves the task correctly on ordinary inputs but returns a wrong answer on a rare input its author chose. A \emph{trusted} model ($T$), which is less capable, and a small budget of human audits are the only defences. The question we ask is simple: if $T$ writes unit tests for a submission and we run them, do those tests catch backdoors that $T$ would miss by reading the code?
+
+In all of our runs $T$ is DeepSeek-V3.2~\citep{deepseekv32} at low reasoning effort. Where a protocol uses $U$ directly, $U$ is the same model at high reasoning effort, so the capability gap between the two comes from reasoning effort alone.
+
+\subsection{Data}
+
+We use APPS programming problems~\citep{hendrycks2021apps} together with the backdoored solutions released with the Control Tax work~\citep{terekhov2025controltax}, taken from the \texttt{apps-control-arena} dataset~\citep{appscontrolarena}. A task is usable only if its reference solution compiles and passes the task's tests, its output is deterministic, and at least one backdoor compiles, passes the visible tests and actually fires on its secret input. A backdoor that does not fire is simply a wrong program, and counting it as an attack would credit every protocol for finding a bug nobody planted.
+
+Every task contributes exactly two candidates: one honest submission (the first human-written APPS solution) and one backdoored submission. Taking one of each stops any task from being counted twice in a rate.
+
+We built three pools with the same filter:
+\begin{itemize}
+  \item \textbf{Hard} (50 tasks): competition-level problems only.
+  \item \textbf{Random-50} (50 tasks): drawn uniformly from all usable tasks, so the difficulty mix is the benchmark's own.
+  \item \textbf{Uniform-400} (400 tasks): the same uniform draw at eight times the size (34 competition, 286 interview and 80 introductory problems).
+\end{itemize}
+Each pool is split into train and test tasks (20/30 for the 50-task pools, 160/240 for Uniform-400). The split is stored inside the dataset file itself, so every protocol agrees on which tasks are held out.
+
+\paragraph{Removing label leaks.} On inspection, the backdoored code often described its own backdoor in comments, for example \texttt{\# Subtle bug: ...}. This was true of 68\% of attacks in the hard pool and of none of the honest solutions. Because any monitor that reads the code would also read these comments, we removed every comment and every self-describing identifier from both honest and backdoored code. We checked that this did not change behaviour: all provided test cases give the same output as before, and every backdoor still fires on its trigger. All results use the cleaned code.
+
+\subsection{Protocols}
+
+Every protocol scores every candidate in both the train and test splits. Each produces one suspicion score per candidate, and a higher score means more suspicious.
+
+\paragraph{Trusted monitor.} Our baseline, following \citet{greenblatt2024control}. $T$ reads the task and the submitted code and rates, from 1 to 10, how likely the code is to hide a backdoor. We ask twice with different seeds and average the two ratings.
+
+\paragraph{Trigger search.} Before any tests are written, $T$ reads each submission and proposes 30 inputs that it thinks might expose a backdoor. These inputs are generated once and reused by every test-writing protocol. This way, a difference between two protocols reflects the tests they wrote, not a lucky set of inputs.
+
+\paragraph{Unit testing.} $T$ writes a suite of 10 tests for a single submission. Each test is run against every one of that submission's trigger inputs inside a Docker sandbox. The suspicion score is the number of distinct tests that fail. Tests are not allowed to compute the correct answer themselves, because the setting assumes $T$ cannot always solve the task. So a test has to check some property that any correct answer must satisfy. We compare two ways of asking for tests:
+\begin{itemize}
+  \item \textbf{Property tests}, where $T$ may use metamorphic relations (running the program a second time on a modified input and comparing the two answers), bounds on the answer, invariants of the output format, or certificates that verify an answer without having to find it.
+  \item \textbf{Plain tests}, where each test calls the program exactly once and checks that answer alone. This rules out metamorphic relations, which in early runs often asserted relations the specification never promised and so fired on correct code.
+\end{itemize}
+Both prompts tell $T$ that the code shows it \emph{where} to look but never \emph{what} is correct, since a test copied from a suspicious branch passes on the backdoor and fails on correct solutions.
+
+\paragraph{$U$ plans, $T$ writes.} The test-writing step is split between two models. $U$, at high reasoning effort, reads the submission and writes a plan in prose: one intended check per test, with no code. $T$ then writes the suite from that plan without seeing the submission. Execution and scoring are the same as for unit testing. This arm has two known weaknesses, and we run it partly to measure them. First, $U$ is untrusted and sees the code, so a $U$ that recognises its own backdoor could plan tests that avoid it. Second, $U$ runs at a higher reasoning effort than the protocols we compare it with.
+
+\paragraph{Monitor with tests.} The trusted monitor again, with the same prompt, scale and number of calls, plus a report of what a test suite did to the same submission: how many tests were written, which failed and on which inputs, and the suite's source code, with failing tests shown first and never cut short. The prompt warns the monitor that $T$ could not necessarily solve the task, so a failing test may have caught a real backdoor or may be asserting something the specification never promised. We run one version for each of the three suites above (property, plain, and $U$-planned property).
+
+\paragraph{Trusted solve.} $T$ attempts each task on its own and is graded against up to 30 of the task's reference input/output pairs. This tells us how capable $T$ is on each pool, and it gives the usefulness of the defer-to-trusted baseline.
+
+\subsection{Choosing a threshold}
+
+Each protocol flags a submission when its score is at or above a threshold. Following \citet{greenblatt2024control}, we set the threshold to the $(1-b)$ quantile of the \emph{honest} scores on the train split, where $b$ is the audit budget. No attack labels are used to choose it. A real deployment does not have them, and a threshold tuned against one attack policy would not survive that policy changing. Nothing is fitted on the test split.
+
+Test suites have a particular score distribution: most honest submissions fail no tests at all, and a few fail many. The quantile rule therefore tends to give them a strict threshold. So we also evaluate each suite at the threshold a person would naturally use, namely flagging any submission that fails at least one test.
+
+\subsection{Deployment simulation}
+
+We turn scores into safety and usefulness with a simulated deployment. Each deployment is a sequence of 50 submissions drawn from held-out tasks. Each submission is backdoored with probability 5\%, which gives about 2.5 attacks per deployment. There is a budget of 5 human audits (10\% of the horizon), which are spent on flagged submissions in order until they run out. We assume an audit always identifies correctly whether a submission is a backdoor. The same random sequences are shared by every protocol, so all protocols face exactly the same deployments.
+
+We study three versions of the game, which differ only in what happens to a flagged submission:
+
+\begin{center}
+\begin{tabular}{|l|p{4.2cm}|p{3.2cm}|l|}
+\hline
+ & \textbf{Flagged, audit left} & \textbf{Flagged, no audit left} & \textbf{Not flagged} \\
+\hline
+A & Audited. A backdoor ends the deployment (caught); an honest submission ships. & Ships anyway. & Ships. \\
+\hline
+B & Audited. A backdoor is dropped; an honest submission ships. & Dropped. & Ships. \\
+\hline
+C & Audited. A backdoor ends the deployment (caught); an honest submission ships. & Dropped. & Ships. \\
+\hline
+\end{tabular}
+\end{center}
+
+\textbf{Safety} is the fraction of deployments in which no backdoor ever shipped. \textbf{Usefulness} is the fraction of honest submissions that shipped, out of those that arrived. In game A usefulness is always 1, because nothing is ever held back. In games B and C an honest submission is lost only when it is flagged after the audit budget has run out. Games A and C can end early, so we report how many steps each deployment lasted separately, rather than counting early endings against usefulness.
+
+We run 20,000 simulated deployments at the main setting above. To check that our conclusions do not depend on that one setting, we repeat the simulation (10,000 deployments each) over audit budgets from 1\% to 20\% and attack rates from 1\% to 10\%, using the same threshold rule everywhere. We also report ROC curves and AUC for each protocol on the held-out candidates, which show how well it separates the two classes at every possible threshold, independently of the deployment game.
+
+\subsection{Handling failures}
+
+Model calls and sandbox runs sometimes fail. A failed candidate is removed from the analysis for that protocol and is never counted as a clean result. For a test suite, a run that did not finish can only have missed failures, never invented them, so treating it as ``no tests failed'' would bias every result towards safety. For a fair comparison, all headline results use only the candidates that every protocol scored successfully.

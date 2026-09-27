@@ -145,8 +145,11 @@ that wrote it — a measurement should not need the machinery that made the thin
 ## Running an experiment
 
 **Write the entry before the run, not after.** `reports/EXPERIMENTS.md` is gone; the convention it
-carried is not. **The prediction goes in the markdown cell above the section, written before the cell
-below it runs**, with the same fields:
+carried is not. **The entry goes in the plan file that owns the run, written before the run is
+launched** — `scale_plan.md` holds E9 and is the worked example. A notebook markdown cell is fine
+for an experiment a notebook owns end to end, but the notebooks are generated from
+`notebooks/build_results.py`, so an entry typed into a `.ipynb` is lost at the next rebuild. Same
+fields either way:
 
 ```
 ### E<n> — <name>

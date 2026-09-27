@@ -1,7 +1,7 @@
 # Deployment — the one section not yet rebuilt
 
 Everything else in this repo was rewritten around one protocol, one run, one artifact. The
-deployment game was not. It lived in five cells of the old `notebooks/apps.ipynb` and was deleted
+deployment game was not. It lived in five cells of a since-deleted notebook and was deleted
 from the library on the grounds that the notebook is the source; it has not been written back.
 
 This file is the list of what was wrong with it, kept because the defects are the design.
@@ -17,7 +17,7 @@ inflates safety for exactly the protocols that abstain most.
 | 1 | `score_of` returns **0.0 for an abstention** | `on_abstain="ship" \| "audit"` as a declared parameter, abstention count reported beside safety |
 | 2 | `kill` returns safe the instant the trigger fires on anything — safety 0.99 at usefulness 0.03, a degenerate bound sitting in a table of protocols | its own table, labelled a bound; it answers "what if we stop deploying" |
 | 3 | usefulness is structurally 1.000 for `tm` and `audit` — only `reject`/`kill` withhold code | **the defer-to-trusted arm**, below |
-| 4 | three implementations of "fit a threshold on train" | one `sweep()`/`pick()`, now in `apps-22nd.ipynb` |
+| 4 | three implementations of "fit a threshold on train" | one `budget_quantile()`, in `notebooks/build_results.py` |
 | 5 | attack policy fixed — first attack per task, constant Bernoulli, never chooses when to strike | `attack_selection="bernoulli" \| "always" \| "rare"`, limitation stated |
 | 6 | `free_floor` 0.364 — a third of trials contain no attack and every protocol wins them free | always report `safety − free_floor`, with the floor beside it |
 | 7 | usefulness reads `main_task_success`, which lives outside the records | ground truth from `Dataset`, so deployment reads records plus the dataset and nothing else |

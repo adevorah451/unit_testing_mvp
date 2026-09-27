@@ -13,16 +13,17 @@ This is the ONLY place untrusted candidate code runs, so it owns three bounds:
 Records stream to disk one line at a time, so none of the three loses the pairs already finished.
 
 Isolation is a parameter, not a property of this module: SUBPROCESS is a timeout and
-process-group boundary only, DOCKER is a real one. SUBPROCESS stays the default because the mock
-path runs under it, but it is not a choice a real run gets: `Settings._runnable` refuses any
-non-mock run that is not DOCKER, because macOS cannot enforce RLIMIT_AS/DATA/RSS and an unbounded
-candidate takes the host down instead of itself.
+process-group boundary only, DOCKER is a real one. SUBPROCESS stays the default because the test
+suite runs under it, but it is not a choice a real run gets: every protocol that reaches here
+passes `isolation=ISOLATION`, which is `Isolation.DOCKER` in all of them, because macOS cannot
+enforce RLIMIT_AS/DATA/RSS and an unbounded candidate takes the host down instead of itself.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -33,6 +34,7 @@ from pathlib import Path
 from typing import Any
 
 from .data import Task
+from .prompts import SUITE_FUNCTION_PREFIXES
 
 SINGLE_CANDIDATE_CALL_SECONDS = 6
 DEFAULT_PBT_TIMEOUT = 60
@@ -62,7 +64,7 @@ __PROPERTIES__
 SPACE = json.loads(__SPACE_JSON__)
 __BARE_RUN_PROBE__
 _props = [(n, f) for n, f in sorted(globals().items())
-          if (n.startswith("prop_") or n.startswith("test_")) and callable(f)]
+          if n.startswith(__SUITE_PREFIXES__) and callable(f)]
 _pbt_emit({"props": [n for n, _ in _props], "bare_run_ok": _bare_run_ok})
 for _i, _x, _pname, _pfn in [(i, x, n, f) for i, x in enumerate(SPACE) for n, f in _props]:
     if time.monotonic() >= _pbt_deadline:
@@ -145,6 +147,28 @@ def run(x):
 """
 
 
+_HARNESS_SLOT = re.compile(r"__([A-Z][A-Z_]*)__")
+
+
+def _filled(template: str, **slots: str) -> str:
+    """Fill every `__SLOT__` in ONE pass, refusing a template with a slot nothing supplies.
+
+    One pass and not chained `.replace`, for the reason `prompts.render` is one pass: the
+    candidate's source and the model's test suite are both slot *values*, and a `__SPACE_JSON__`
+    written inside either would be expanded by whichever pass came next and rewrite the harness
+    around itself. The pattern needs an uppercase head so the template's own `__name__` and
+    `__main__` are left alone, and the replacement goes through a function so a backslash in a
+    candidate cannot be read as a group reference.
+    """
+    missing = sorted(set(_HARNESS_SLOT.findall(template)) - set(slots))
+    if missing:
+        raise ValueError(
+            f"the harness template has no value for {', '.join(missing)} — a slot left unfilled "
+            "reaches the container as a NameError on every pair"
+        )
+    return _HARNESS_SLOT.sub(lambda hit: slots[hit.group(1)], template)
+
+
 def build_harness(
     task: Task,
     code: str,
@@ -161,28 +185,30 @@ def build_harness(
     the gate needs all of its verdicts and `_validated_bare_run` refuses a short one.
 
     `work_seconds` bounds the whole script. Inputs are the outer loop so a budget that runs out
-    costs every property the same tail rather than starving whichever sort last. `__WORK_SECONDS__`
-    is substituted before the candidate and properties are inlined, so neither can rewrite it.
+    costs every property the same tail rather than starving whichever sort last. It is filled by
+    `_filled`, in one pass, so it cannot be rewritten by anything the model wrote.
     """
     if task.io_mode == "function":
-        setup = (
-            _ENTRY_FUNCTION.replace("__CANDIDATE_SRC__", repr(code))
-            .replace("__ENTRY_NAME__", repr(task.entry_point))
-            .replace("__CAND_TIMEOUT__", str(SINGLE_CANDIDATE_CALL_SECONDS))
+        setup = _filled(
+            _ENTRY_FUNCTION,
+            CANDIDATE_SRC=repr(code),
+            ENTRY_NAME=repr(task.entry_point),
+            CAND_TIMEOUT=str(SINGLE_CANDIDATE_CALL_SECONDS),
         )
     else:
-        setup = _ENTRY_STDIO.replace("__CANDIDATE_SRC__", repr(code)).replace(
-            "__CAND_TIMEOUT__", str(SINGLE_CANDIDATE_CALL_SECONDS)
+        setup = _filled(
+            _ENTRY_STDIO,
+            CANDIDATE_SRC=repr(code),
+            CAND_TIMEOUT=str(SINGLE_CANDIDATE_CALL_SECONDS),
         )
-    return (
-        _HARNESS.replace("__WORK_SECONDS__", str(max(1, work_seconds)))
-        .replace("__ENTRY_SETUP__", setup)
-        .replace("__PROPERTIES__", props_src)
-        .replace("__SPACE_JSON__", repr(json.dumps(space)))
-        .replace(
-            "__BARE_RUN_PROBE__",
-            _BARE_RUN_PROBE if probe_bare_run else _NO_BARE_RUN_PROBE,
-        )
+    return _filled(
+        _HARNESS,
+        WORK_SECONDS=str(max(1, work_seconds)),
+        SUITE_PREFIXES=repr(tuple(SUITE_FUNCTION_PREFIXES)),
+        SPACE_JSON=repr(json.dumps(space)),
+        BARE_RUN_PROBE=_BARE_RUN_PROBE if probe_bare_run else _NO_BARE_RUN_PROBE,
+        ENTRY_SETUP=setup,
+        PROPERTIES=props_src,
     )
 
 

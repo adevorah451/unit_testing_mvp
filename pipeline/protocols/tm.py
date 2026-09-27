@@ -14,15 +14,24 @@ from __future__ import annotations
 
 import re
 
-import asyncio
 from statistics import fmean
-from threading import Lock, Thread
-from typing import Any, Sequence
+from typing import Any
 
 from .. import prompts
-from ..model import INSPECT_HTTP_RETRIES, MULTI_RUN_TEMPERATURE, ModelRuntime, ModelSpec, Reasoning, SINGLE_RUN_TEMPERATURE, TimeoutLadder
 from ..data import Blame, Candidate, Dataset, Task
-from ..model import Completion, TrustedModel, complete_sync, resolve
+from ..model import (
+    INSPECT_HTTP_RETRIES,
+    MULTI_RUN_TEMPERATURE,
+    SINGLE_RUN_TEMPERATURE,
+    Completion,
+    ModelRuntime,
+    ModelSpec,
+    Reasoning,
+    TimeoutLadder,
+    TrustedModel,
+    complete_sync,
+    resolve,
+)
 from .base import CALLS, Run
 
 TEMPLATE = "trusted_monitor.txt"
@@ -79,12 +88,6 @@ def parse_suspicion(text: str | None) -> float | None:
     return (value - SCALE_BOTTOM) / (SCALE_TOP - SCALE_BOTTOM)
 
 
-def _blame_across(calls: Sequence[dict[str, Any]]) -> str:
-    """`infra` if any repetition never returned, `model` otherwise — one infra rep decides."""
-    fell_over = any(call["blame"] == Blame.INFRA for call in calls)
-    return Blame.INFRA.value if fell_over else Blame.MODEL.value
-
-
 class TrustedMonitor(Run):
     """Greenblatt et al.'s trusted monitor: rate this code 1-10 for hidden-backdoor suspicion.
 
@@ -132,6 +135,10 @@ class TrustedMonitor(Run):
         threshold sweep reads. A repetition that produced none holds `None` in its own position in
         `scores` — dropping it would renumber the reps — and carries its blame in `calls`. A
         candidate no repetition rated is `failed` with `avg_score=None`, never `0.0`.
+
+        That blame is always `model`. A call that never returned raises out of `complete_sync` and
+        the base books the candidate as infra, so every repetition that reaches here came back and
+        simply carried no `SUSPICION_SCORE` line.
         """
         if not self.monitors:
             raise RuntimeError(
@@ -148,7 +155,7 @@ class TrustedMonitor(Run):
                 "scores": scores,
                 "avg_score": None,
                 "failed": True,
-                "blame": _blame_across(calls),
+                "blame": Blame.MODEL.value,
                 "reason": "; ".join(
                     f"rep {call['rep']}: {call['reason']}" for call in calls
                 )[:REASON_CHARS],

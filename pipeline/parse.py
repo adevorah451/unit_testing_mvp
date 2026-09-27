@@ -13,6 +13,8 @@ import json
 import re
 from typing import Any
 
+from .prompts import SUITE_FUNCTION_PREFIXES
+
 _SINGLE_WORD_INFO_STRING = r"(?:[A-Za-z0-9_+#.-]*[ \t]*\r?\n)?"
 FENCED_CODE = rf"```{_SINGLE_WORD_INFO_STRING}\s*(.*?)```"
 _FENCED_TAGGED = r"```(?:([A-Za-z0-9_+#.-]*)[ \t]*\r?\n)?\s*(.*?)```"
@@ -77,7 +79,7 @@ def parse_properties(completion: str) -> tuple[str | None, str | None]:
         node
         for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        and (node.name.startswith("prop_") or node.name.startswith("test_"))
+        and node.name.startswith(SUITE_FUNCTION_PREFIXES)
     ]
     if not funcs:
         return None, "no top-level prop_/test_ functions defined"

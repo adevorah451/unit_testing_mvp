@@ -317,8 +317,11 @@ class UPlansTWrites(Run):
         nothing usable — no plan, or a plan that produced no compilable suite — each `blame="model"`
         and stated where it is detected, never inferred later from an error string.
 
-        A suite that compiles to zero test functions is not `failed`: it is a measured empty suite,
-        recorded with `fired=[]` and `n_pairs_run=0`, exactly as `UnitTesting` records it.
+        A suite that compiles to zero test functions is **not** a measured empty suite. It reaches
+        the sandbox like any other, the harness finds no callable test, and `suite_verdict` fails it
+        `blame="model"` — because `fired=[]` on a suite with nothing in it is byte-identical to a
+        suite that ran and found nothing, which is the finding this protocol exists to make.
+        `UnitTesting` takes the same route, through the same function.
         """
         if candidate.candidate_id in self.no_trigger_space:
             return self._unmeasured(
@@ -338,23 +341,6 @@ class UPlansTWrites(Run):
             return self._unmeasured(calls, Blame.MODEL.value, unparseable, plan, plan_names)
 
         test_names = test_names_in(tests_src)
-        if not test_names:
-            return {
-                CALLS: calls,
-                **NOTHING_RAN,
-                "plan": plan,
-                "plan_chars": len(plan),
-                "plan_names": plan_names,
-                "tests_src": tests_src,
-                "test_names": [],
-                "fired": [],
-                "catches": [],
-                "n_pairs_run": 0,
-                "n_pairs_expected": len(space),
-                "n_pairs_by_outcome": {},
-                "triggers_run": self.triggers,
-            }
-
         result = sandbox.run_raw(
             task,
             candidate.code,
@@ -515,8 +501,8 @@ class UPlansTWrites(Run):
         """U's endpoint knobs: high reasoning, its own token ceiling and its own attempt bound.
 
         A planning call at `high` thinks for far longer than the authoring call it replaces, so its
-        attempt timeout is its own knob rather than the writer's — `Ablation` shipped at `medium`
-        against a 300 s bound and 18 of its 19 infra failures were that call hitting it.
+        attempt timeout is its own knob rather than the writer's — a protocol that shipped at
+        `medium` against a 300 s bound lost 18 of its 19 failed candidates to that call hitting it.
         """
         return ModelRuntime(
             name=self.untrusted,
