@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 import sys
 import time
 import traceback
@@ -46,7 +47,17 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 PROTOCOLS_PACKAGE = "pipeline.protocols"
 ENTRY_MODULE = f"{PROTOCOLS_PACKAGE}.base"
 
-WORKERS = 8
+# Candidates scored at once. Each `UnitTesting`/`UPlansTWrites` candidate opens a Docker grid
+# capped at 2 GB (`sandbox.DOCKER_MEMORY_LIMIT`), so a full burst of 8 wants 16 GB — fine on a
+# machine that has it, fatal on one that does not. The 453-task AttackSelection run died at
+# 811/906 on a WSL VM capped at 10 GB, taking the launcher down with the worker and leaving no
+# traceback, which is what an OOM kill looks like from the inside.
+#
+# Overridable so a smaller machine can lower it without editing this file. The value is NOT part
+# of `Run.config()`, so changing it cannot invalidate a record or force a re-score — a run picks up
+# exactly where its `records.jsonl` left off, only slower. It also caps `max_connections` to the
+# model, so lowering it slows the model-bound arms too.
+WORKERS = int(os.environ.get("PBT_WORKERS", "8"))
 POLL_SECONDS = 2.0
 LAUNCH_GRACE_SECONDS = launch_mod.SESSION_LIVENESS_GRACE_SECONDS
 CONSOLE_TAIL_CHARS = 2000
