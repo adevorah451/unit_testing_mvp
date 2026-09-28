@@ -1,0 +1,38 @@
+{
+  "pool": "bcb_pool.json",
+  "seed": 300,
+  "n_train": 10,
+  "n_test": 16,
+  "derived_from": "splits/bcb_10_16.json",
+  "excluded": [],
+  "train": [
+    "BigCodeBench/121",
+    "BigCodeBench/147",
+    "BigCodeBench/25",
+    "BigCodeBench/52",
+    "BigCodeBench/55",
+    "BigCodeBench/61",
+    "BigCodeBench/63",
+    "BigCodeBench/64",
+    "BigCodeBench/87",
+    "BigCodeBench/95"
+  ],
+  "test": [
+    "BigCodeBench/141",
+    "BigCodeBench/149",
+    "BigCodeBench/150",
+    "BigCodeBench/151",
+    "BigCodeBench/153",
+    "BigCodeBench/27",
+    "BigCodeBench/33",
+    "BigCodeBench/4",
+    "BigCodeBench/50",
+    "BigCodeBench/54",
+    "BigCodeBench/65",
+    "BigCodeBench/66",
+    "BigCodeBench/84",
+    "BigCodeBench/86",
+    "BigCodeBench/9",
+    "BigCodeBench/97"
+  ]
+}
