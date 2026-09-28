@@ -308,6 +308,8 @@ class UPlansTWrites(Run):
         self.trigger_space, self.no_trigger_space = spaces_from(self.triggers, data)
         model_mod.resolve(self._planner_runtime())
         model_mod.resolve(self._writer_runtime())
+        if ISOLATION is sandbox.Isolation.DOCKER:
+            sandbox.preflight(self.docker_image)
 
     def score(self, task: Task, candidate: Candidate) -> dict[str, Any]:
         """Plan, write, run the suite over this candidate's trigger inputs, and judge the grid.

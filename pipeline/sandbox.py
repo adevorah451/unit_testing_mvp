@@ -375,6 +375,43 @@ def _docker_command(directory: str, image: str, container: str) -> list[str]:
     ]
 
 
+def preflight(image: str) -> None:
+    """Raise unless `docker run` on `image` actually works here. Called once, before any candidate.
+
+    Every other way this fails is silent and expensive. A `docker` that is not on PATH, a daemon
+    that is not running, or an image that was never built all surface as `harness exited 1` — one
+    infra record per candidate, written at hundreds per minute, indistinguishable at a glance from
+    a grid that ran and found nothing. It cost two arms of a 906-candidate run twice in one day:
+    once when Docker Desktop's WSL integration was switched off, once when Docker Desktop simply
+    was not running after a reboot.
+
+    So this is the same contract `prepare` already holds for a short trigger run and a missing
+    `AZUREAI_API_KEY`: a dependency that is absent must fail before the first model call, not
+    halfway through with half an artifact on disk. `docker run --rm <image> true` rather than
+    `docker info`, because the image matters as much as the daemon and only running it proves both.
+    """
+    if shutil.which("docker") is None:
+        raise RuntimeError(
+            "docker is not on PATH, so every sandbox grid would fail at once. Under WSL this is "
+            "usually Docker Desktop not running, or its integration for this distro switched off "
+            "(Settings -> Resources -> WSL integration)."
+        )
+    try:
+        proc = subprocess.run(["docker", "run", "--rm", image, "true"],
+                              capture_output=True, timeout=180)
+    except subprocess.TimeoutExpired as slow:
+        raise RuntimeError(
+            f"`docker run {image} true` did not return within 180s, so the daemon is unhealthy "
+            "rather than absent. Every grid would be killed at its own timeout."
+        ) from slow
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or b"").decode("utf-8", "replace").strip()
+        raise RuntimeError(
+            f"`docker run {image} true` exited {proc.returncode}, so no grid can run. "
+            f"Build the image first (see docker/) if this says it is missing: {detail[:400]}"
+        )
+
+
 def _docker_kill(container: str) -> None:
     try:
         subprocess.run(["docker", "kill", container], capture_output=True, timeout=20)

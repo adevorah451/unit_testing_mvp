@@ -586,6 +586,8 @@ class UnitTesting(Run):
         """
         self.trigger_space, self.no_trigger_space = spaces_from(self.triggers, data)
         model_mod.resolve(self._runtime())
+        if ISOLATION is sandbox.Isolation.DOCKER:
+            sandbox.preflight(self.docker_image)
 
     def score(self, task: Task, candidate: Candidate) -> dict[str, Any]:
         """Author one suite for this candidate and run it over that candidate's trigger inputs.
