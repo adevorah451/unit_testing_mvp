@@ -122,11 +122,59 @@ def input_block(completion: str) -> str:
     return max(fenced, key=len) if fenced else completion
 
 
+def _as_json_shapes(value: Any) -> Any:
+    """Python literals rewritten into the shapes JSON has, which means tuples become lists.
+
+    A list is not a tuple — it is unhashable, so it cannot key a dict or enter a set, and
+    `isinstance(x, tuple)` turns False. Every task reached this way so far only indexes and iterates
+    its argument, where the two behave identically; a task that branched on the type would be
+    silently handed something else, which is why `read_input_lines` records that the rewrite
+    happened rather than doing it invisibly.
+    """
+    if isinstance(value, (tuple, list)):
+        return [_as_json_shapes(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _as_json_shapes(item) for key, item in value.items()}
+    return value
+
+
+def _literal_line(line: str) -> tuple[Any, bool]:
+    """`(value, True)` for a line that is a Python literal JSON cannot spell, else `(None, False)`.
+
+    `ast.literal_eval` and not `eval`: it accepts literals only — no calls, no names, no attribute
+    access — so a completion cannot execute anything here. It also refuses arithmetic, which is
+    deliberate. `{"xs": [("a", 2)] * 64}` and `2**31` are operations rather than literals and stay
+    unread, counted in `dropped` like any other line this parse cannot take.
+
+    The value must also survive `json.dumps`, because the record carrying it is written as JSON.
+    `literal_eval` spells types JSON has no form for — `4j`, `b"x"`, `{1, 2}`, a tuple used as a
+    dict key — and `_as_json_shapes` only reshapes containers, so one of those passes straight
+    through. Accepting it trades a line that used to be dropped for a run that dies at the write,
+    after every model call has been paid for, which is how a BigCodeBench trigger search died on a
+    complex literal. Dropping it here costs one input out of thirty and keeps the artifact.
+    """
+    try:
+        value = _as_json_shapes(ast.literal_eval(line))
+    except (ValueError, SyntaxError, TypeError, MemoryError, RecursionError):
+        return None, False
+    try:
+        json.dumps(value)
+    except (TypeError, ValueError):
+        return None, False
+    return value, True
+
+
 def read_input_lines(blob: str) -> list[dict[str, Any]]:
     """Every candidate input line, with what it parsed to or why it did not parse.
 
     `ok` carries whether the line read, because `value` alone cannot: a line holding `null` parses
     fine and to `None`, indistinguishable from a line that failed.
+
+    JSON first, always. A line JSON accepts is read exactly as before, so this function can only
+    turn a line that used to fail into one that reads — no existing parse changes. The fallback is
+    for the one shape the prompt asks for but JSON cannot spell: a task whose argument is described
+    as a list of *tuples* gets tuples, faithfully, and `(` is not JSON. `rewritten` marks those, so
+    a reader can tell a literal-parsed line from a JSON one.
     """
     read: list[dict[str, Any]] = []
     for number, raw in enumerate(blob.splitlines(), 1):
@@ -134,9 +182,12 @@ def read_input_lines(blob: str) -> list[dict[str, Any]]:
         if not line or line in STRUCTURAL_LINES:
             continue
         try:
-            read.append({"line": number, "text": line, "ok": True, "value": json.loads(line), "reason": ""})
+            read.append({"line": number, "text": line, "ok": True, "value": json.loads(line),
+                         "reason": "", "rewritten": False})
         except json.JSONDecodeError as error:
-            read.append({"line": number, "text": line, "ok": False, "value": None, "reason": error.msg})
+            value, recovered = _literal_line(line)
+            read.append({"line": number, "text": line, "ok": recovered, "value": value,
+                         "reason": "" if recovered else error.msg, "rewritten": recovered})
     return read
 
 

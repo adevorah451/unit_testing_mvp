@@ -129,8 +129,30 @@ def trigger_inputs(candidate_id: str) -> list[str]:
 
 
 def trigger_answer(candidate_id: str) -> str:
-    """The inputs answer in the shape `parse.parse_search_space` reads: one JSON value per line."""
-    return "\n".join(json.dumps(line) for line in trigger_inputs(candidate_id)) + "\n"
+    """The inputs answer in the shape `parse.parse_search_space` reads: one JSON value per line.
+
+    The last line is written as a Python literal instead — `repr` single-quotes a string, and JSON
+    has only double quotes — because that is the one shape a provider actually produced and the
+    parser used to reject outright. Two BigCodeBench tasks describe their argument as a list of
+    *tuples*, the model wrote tuples, and every line of all four answers was thrown away: the
+    records failed `blame="model"` for answers that named the right inputs in the wrong dialect.
+    `read_input_lines` now falls back to `ast.literal_eval`, and this line is what exercises it.
+
+    It is deliberately not a separate test. The assertions in `test_trigger_search_end_to_end` are
+    already the right ones — `inputs == trigger_inputs(...)` and `dropped == 0` — and they only
+    hold if the fallback recovers this line to the byte-identical string JSON would have given.
+    Break the fallback and the space comes back two inputs long with `dropped` at 1.
+    """
+    lines = trigger_inputs(candidate_id)
+    rendered = [json.dumps(line) for line in lines[:-1]] + [repr(lines[-1])]
+    try:
+        json.loads(rendered[-1])
+    except json.JSONDecodeError:
+        return "\n".join(rendered) + "\n"
+    raise AssertionError(
+        f"{rendered[-1]!r} is valid JSON, so this fixture no longer reaches the literal fallback "
+        "it exists to cover — write the last line in a dialect json.loads refuses"
+    )
 
 
 def suite_answer() -> str:
