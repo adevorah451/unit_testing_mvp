@@ -26,6 +26,8 @@ from .tm import TM, TrustedMonitor
 from .trigger_search import TriggerSearch
 from .u_plans_t_writes import UPlansTWrites
 from .unit_testing import UnitTesting
+from .test_repair import TestRepair
+from .second_revision import SecondRevision
 
 __all__ = [
     "REGISTRY",
@@ -39,5 +41,7 @@ __all__ = [
     "TriggerSearch",
     "UPlansTWrites",
     "UnitTesting",
+    "TestRepair",
+    "SecondRevision",
     "main",
 ]

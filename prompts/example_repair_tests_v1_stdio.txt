@@ -1,0 +1,10 @@
+Unrelated simple task: read two integers and print their sum. A saved test asserts that the answer
+is the sum. It caught the input "2 3\n". That catch does not justify weakening the assertion: the
+specification requires 5. Preserve this assertion, even if the supplied program printed 6.
+
+def test_sum(run, x):
+    a, b = map(int, x.split())
+    assert int(run(x).strip()) == a + b
+
+If instead the saved test asserted an even answer for every input, remove that unsupported claim and
+replace it with the specification-grounded sum check. The correction follows the task, not the output.

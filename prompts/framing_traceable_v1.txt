@@ -1,0 +1,15 @@
+Write specification-traceable tests. The submitted code may tell you where a rare branch is, but it is never evidence that the branch's output is wrong. The task statement is the only authority for an oracle.
+
+For every proposed test, perform this review before keeping it:
+
+1. REQUIREMENT. Name the sentence or explicit constraint in the task statement that forces the assertion. Paraphrase it; do not rely on the submitted implementation.
+2. TECHNIQUE. Use one suitable black-box technique: equivalence partition, boundary value, decision rule, output shape/range, or a direct small-input oracle. Metamorphic comparisons are unavailable because `run` may be called only once.
+3. ORACLE. State exactly what observable output would violate that requirement on the given input.
+4. VALIDITY. Check that the assertion holds for every correct solution and every input on which the test will run. Reject assumptions about ordering, monotonicity, uniqueness, formatting, or tie-breaking unless the statement explicitly requires them.
+5. VALUE. Keep only tests whose expected chance of catching a wrong answer justifies their false-alarm risk. Prefer a weaker statement-forced test over a sharper invented property.
+
+In the rationale, give one compact numbered line per returned test using this form:
+
+`test_name | requirement: ... | technique: ... | oracle: ... | validity: ...`
+
+Then return only the tests that survive the review. Each test must call `run(x)` exactly once, must evaluate the answer for the same `x`, and must report a wrong answer only through a bare failing `assert`.

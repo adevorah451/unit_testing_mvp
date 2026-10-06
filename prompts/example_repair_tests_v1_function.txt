@@ -1,0 +1,9 @@
+Unrelated simple task: task_func(a, b) returns the sum of two integers. A saved test asserts that
+the answer is the sum. It caught input {"a": 2, "b": 3}. That catch does not justify weakening the
+assertion: the specification requires 5. Preserve it, even if the supplied program returned 6.
+
+def test_sum(run, x):
+    assert run(x) == x["a"] + x["b"]
+
+If instead the saved test asserted an even answer for every input, remove that unsupported claim and
+replace it with the specification-grounded sum check. The correction follows the task, not the output.
